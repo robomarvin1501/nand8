@@ -82,6 +82,15 @@ M=D              // Push the constant onto the stack
 M=M+1            // Increment the stack pointer
 ";
 
+const COMMAND_PUSH_STATIC: &'static str = "@INDEX // PUSH STATIC command
+D=M              // Load the value into D
+@SP
+A=M              // Point to the top of the stack
+M=D              // Push the constant onto the stack
+@SP
+M=M+1            // Increment the stack pointer
+";
+
 const COMMAND_POP: &'static str = "@BASE    // POP command
 D=SEGMENT_ACCESS // Load the base address into D
 @INDEX
@@ -101,6 +110,13 @@ AM=M-1           // Decrement SP and point to the topmost value
 D=M              // Store the topmost value in D
 @BASE
 M=D              // Store the value directly into the base address
+";
+
+const COMMAND_POP_STATIC: &'static str = "@SP // POP STATIC command
+AM=M-1           // Decrement SP and point to the topmost value
+D=M              // Store the topmost value in D
+@INDEX
+M=D              // Store the value directly in the address of the variable
 ";
 
 pub fn compile(instructions: Vec<Instruction>) -> Vec<String> {
@@ -142,10 +158,8 @@ pub fn compile(instructions: Vec<Instruction>) -> Vec<String> {
                     Segment::Constant => {
                         COMMAND_PUSH_CONSTANT.replace("INDEX", &push.index.to_string())
                     }
-                    Segment::Static => COMMAND_PUSH
-                        .replace("BASE", "Static")
-                        .replace("SEGMENT_ACCESS", "A")
-                        .replace("INDEX", &push.index.to_string()),
+                    Segment::Static => COMMAND_PUSH_STATIC
+                        .replace("INDEX", &format!("Static.{}", push.index))
                 };
                 Some(asm)
             }
@@ -175,10 +189,8 @@ pub fn compile(instructions: Vec<Instruction>) -> Vec<String> {
                         .replace("BASE", &(5 + pop.index).to_string())
                         .replace("SEGMENT_ACCESS", "A")
                         .replace("INDEX", "0"),
-                    Segment::Static => COMMAND_POP
-                        .replace("BASE", "Static")
-                        .replace("SEGMENT_ACCESS", "A")
-                        .replace("INDEX", &format!("{}", pop.index)),
+                    Segment::Static => COMMAND_POP_STATIC
+                        .replace("INDEX", &format!("Static.{}", pop.index)),
                     Segment::Constant => panic!("Cannot pop from constant"),
                 };
                 Some(asm)

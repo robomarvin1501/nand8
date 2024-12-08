@@ -86,17 +86,6 @@ impl fmt::Display for Segment {
     }
 }
 
-#[derive(Debug)]
-pub struct CArithmetic {
-    pub arithmetic_type: ArithmeticType,
-}
-
-impl CArithmetic {
-    pub fn new(arithmetic_type: ArithmeticType) -> Self {
-        Self { arithmetic_type }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Push {
     pub segment: Segment,
