@@ -1,13 +1,13 @@
 use core::{fmt, panic};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
     CArithmetic(ArithmeticType),
     CPush(Push),
     CPop(Pop),
-    CLabel,
-    CGoto,
-    CIf,
+    CLabel(Label),
+    CGoto(Label),
+    CIf(Label),
     CFunction,
     CReturn,
     CCall,
@@ -107,5 +107,28 @@ pub struct Pop {
 impl Pop {
     pub fn new(segment: Segment, index: u16) -> Self {
         Self { segment, index }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Label {
+    pub parent_function: String,
+    pub label: String,
+}
+
+impl Label {
+    pub fn new(parent_function: &String, label: &String) -> Self {
+        Self {
+            parent_function: parent_function.to_string(),
+            label: label.to_string(),
+        }
+    }
+    pub fn extract_label_name(&self) -> String {
+        let parent = if self.parent_function.is_empty() {
+            "null"
+        } else {
+            &self.parent_function
+        };
+        "FUNCTION_NAME$LABEL".replace("FUNCTION_NAME", parent).replace("LABEL", &self.label)
     }
 }

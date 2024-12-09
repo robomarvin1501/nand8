@@ -63,27 +63,8 @@ M=D              // Push the value onto the stack
 M=M+1            // Increment the stack pointer
 ";
 
-const COMMAND_PUSH_POINTER: &'static str = "@BASE // PUSH POINTER command
-D=M
-@SP
-A=M              // Point to the top of the stack
-M=D              // Push the value onto the stack
-@SP
-M=M+1            // Increment the stack pointer
-";
-
-
-const COMMAND_PUSH_CONSTANT: &'static str = "@INDEX // PUSH CONSTANT command
-D=A              // Load the constant value into D
-@SP
-A=M              // Point to the top of the stack
-M=D              // Push the constant onto the stack
-@SP
-M=M+1            // Increment the stack pointer
-";
-
-const COMMAND_PUSH_STATIC: &'static str = "@INDEX // PUSH STATIC command
-D=M              // Load the value into D
+const COMMAND_PUSH_DIRECT: &'static str = "@INDEX // PUSH CONSTANT command
+D=ORIGIN         // Load the constant value into D
 @SP
 A=M              // Point to the top of the stack
 M=D              // Push the constant onto the stack
@@ -112,14 +93,21 @@ D=M              // Store the topmost value in D
 M=D              // Store the value directly into the base address
 ";
 
-const COMMAND_POP_STATIC: &'static str = "@SP // POP STATIC command
-AM=M-1           // Decrement SP and point to the topmost value
-D=M              // Store the topmost value in D
-@INDEX
-M=D              // Store the value directly in the address of the variable
+const COMMAND_LABEL: &'static str = "(LABEL_NAME)
 ";
 
-pub fn compile(instructions: Vec<Instruction>) -> Vec<String> {
+const COMMAND_GOTO: &'static str = "@LABEL // GOTO
+0;JMP
+";
+
+const COMMAND_IF_GOTO: &'static str = "@SP // IF-GOTO
+AM=M-1
+D=M
+@LABEL
+D;JNE
+";
+
+pub fn compile(instructions: Vec<Instruction>, file_name: &str) -> Vec<String> {
     let mut result: Vec<String> = vec![];
     let mut comparison_count: u16 = 0;
     for instruction in instructions {
@@ -148,18 +136,20 @@ pub fn compile(instructions: Vec<Instruction>) -> Vec<String> {
                         .replace("INDEX", &push.index.to_string()),
                     Segment::Pointer => {
                         let pointer_register = if push.index == 0 { "THIS" } else { "THAT" };
-                        COMMAND_PUSH_POINTER
-                            .replace("BASE", pointer_register)
+                        COMMAND_PUSH_DIRECT
+                            .replace("ORIGIN", "M")
+                            .replace("INDEX", pointer_register)
                     }
                     Segment::Temp => COMMAND_PUSH
                         .replace("BASE", &(5 + push.index).to_string())
                         .replace("SEGMENT_ACCESS", "A")
                         .replace("INDEX", "0"), // Temp base starts at 5
-                    Segment::Constant => {
-                        COMMAND_PUSH_CONSTANT.replace("INDEX", &push.index.to_string())
-                    }
-                    Segment::Static => COMMAND_PUSH_STATIC
-                        .replace("INDEX", &format!("Static.{}", push.index))
+                    Segment::Constant => COMMAND_PUSH_DIRECT
+                        .replace("ORIGIN", "A")
+                        .replace("INDEX", &push.index.to_string()),
+                    Segment::Static => COMMAND_PUSH_DIRECT
+                        .replace("ORIGIN", "M")
+                        .replace("INDEX", &format!("{}.{}", file_name, push.index)),
                 };
                 Some(asm)
             }
@@ -189,11 +179,21 @@ pub fn compile(instructions: Vec<Instruction>) -> Vec<String> {
                         .replace("BASE", &(5 + pop.index).to_string())
                         .replace("SEGMENT_ACCESS", "A")
                         .replace("INDEX", "0"),
-                    Segment::Static => COMMAND_POP_STATIC
-                        .replace("INDEX", &format!("Static.{}", pop.index)),
+                    Segment::Static => {
+                        COMMAND_POP_DIRECT.replace("BASE", &format!("{}.{}", file_name, pop.index))
+                    }
                     Segment::Constant => panic!("Cannot pop from constant"),
                 };
                 Some(asm)
+            }
+            Instruction::CLabel(ref label) => {
+                Some(COMMAND_LABEL.replace("LABEL_NAME", &label.extract_label_name()))
+            }
+            Instruction::CIf(ref label) => {
+                Some(COMMAND_IF_GOTO.replace("LABEL", &label.extract_label_name()))
+            }
+            Instruction::CGoto(ref label) => {
+                Some(COMMAND_GOTO.replace("LABEL", &label.extract_label_name()))
             }
             _ => None,
         };

@@ -53,7 +53,8 @@ fn compile_file(input_path: PathBuf, output_path: PathBuf) {
 
     let instructions = parser::parse(lines);
 
-    let compiled_asm = compiler::compile(instructions);
+    let file_name = &output_path.file_stem().unwrap().to_str().unwrap();
+    let compiled_asm = compiler::compile(instructions, file_name);
 
     let mut file = File::create(output_path).unwrap();
     for line in compiled_asm {
