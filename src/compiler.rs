@@ -1,111 +1,15 @@
 use core::panic;
 
+use crate::asm_templates::{
+    COMMAND_BINARY, COMMAND_CALL, COMMAND_COMPARE, COMMAND_FUNCTION, COMMAND_GOTO, COMMAND_IF_GOTO,
+    COMMAND_LABEL, COMMAND_POP, COMMAND_POP_DIRECT, COMMAND_PUSH, COMMAND_PUSH_DIRECT,
+    COMMAND_RETURN, COMMAND_SHIFT, COMMAND_UNARY,
+};
+
 use crate::instructions::{
     ArithmeticType, BinaryArithmeticOperator, Instruction, Segment, ShiftArithmeticOperator,
     UnaryArithmeticOperator,
 };
-
-const COMMAND_BINARY: &'static str = "@SP   // BINARY command
-AM=M-1         // Decrement SP and point to the topmost value
-D=M            // Store the topmost value (y) in D
-@SP
-AM=M-1         // Decrement SP again to point to the second topmost value
-M=M{}D         // Perform binary operation: x OPERATOR y, store the result in the current top of stack
-@SP
-M=M+1          // Increment SP to point to the new top of the stack
-";
-
-const COMMAND_UNARY: &'static str = r#"@SP  // UNARY command
-AM=M-1
-M={}M
-@SP
-M=M+1
-"#;
-
-const COMMAND_SHIFT: &'static str = r#"@SP  // SHIFT command
-AM=M-1
-M=M{}
-@SP
-M=M+1
-"#;
-
-const COMMAND_COMPARE: &'static str = "@SP   // COMPARISON command (EQ, GT, LT)
-AM=M-1         // Decrement SP and point to the topmost value (y)
-D=M            // Store the topmost value (y) in D
-@SP
-AM=M-1         // Decrement SP again to point to the second topmost value (x)
-D=M-D          // Subtract y from x (D = x - y)
-@TRUE_COMPARE  // Jump to TRUE_COMPARE if the condition is met
-D;JUMP_TYPE    // Conditional jump: JUMP_TYPE is replaced with JEQ, JGT, or JLT
-@SP
-A=M            // Point to the current top of the stack
-M=0            // Set the result to false (0) because the condition is not met
-@END_COMPARE   // Jump to END_COMPARE to skip the true case
-0;JMP          // Unconditional jump to END_COMPARE
-(TRUE_COMPARE)
-@SP
-A=M            // Point to the current top of the stack
-M=-1           // Set the result to true (-1) because the condition is met
-(END_COMPARE)
-@SP
-M=M+1          // Increment SP to point to the new top of the stack
-";
-
-const COMMAND_PUSH: &'static str = "@BASE   // PUSH command
-D=SEGMENT_ACCESS // Load the base address or constant value into D
-@INDEX
-A=D+A            // Compute the effective address (base + index)
-D=M              // Load the value at the effective address into D
-@SP
-A=M              // Point to the top of the stack
-M=D              // Push the value onto the stack
-@SP
-M=M+1            // Increment the stack pointer
-";
-
-const COMMAND_PUSH_DIRECT: &'static str = "@INDEX // PUSH CONSTANT command
-D=ORIGIN         // Load the constant value into D
-@SP
-A=M              // Point to the top of the stack
-M=D              // Push the constant onto the stack
-@SP
-M=M+1            // Increment the stack pointer
-";
-
-const COMMAND_POP: &'static str = "@BASE    // POP command
-D=SEGMENT_ACCESS // Load the base address into D
-@INDEX
-D=D+A            // Compute the effective address (base + index)
-@R13
-M=D              // Store the effective address in R13
-@SP
-AM=M-1           // Decrement SP and point to the topmost value
-D=M              // Store the topmost value in D
-@R13
-A=M              // Point to the effective address
-M=D              // Store the value at the effective address
-";
-
-const COMMAND_POP_DIRECT: &'static str = "@SP   // POP CONSTANT command
-AM=M-1           // Decrement SP and point to the topmost value
-D=M              // Store the topmost value in D
-@BASE
-M=D              // Store the value directly into the base address
-";
-
-const COMMAND_LABEL: &'static str = "(LABEL_NAME)
-";
-
-const COMMAND_GOTO: &'static str = "@LABEL // GOTO
-0;JMP
-";
-
-const COMMAND_IF_GOTO: &'static str = "@SP // IF-GOTO
-AM=M-1
-D=M
-@LABEL
-D;JNE
-";
 
 pub fn compile(instructions: Vec<Instruction>, file_name: &str) -> Vec<String> {
     let mut result: Vec<String> = vec![];
@@ -195,7 +99,18 @@ pub fn compile(instructions: Vec<Instruction>, file_name: &str) -> Vec<String> {
             Instruction::CGoto(ref label) => {
                 Some(COMMAND_GOTO.replace("LABEL", &label.extract_label_name()))
             }
-            _ => None,
+            Instruction::CCall(ref call) => Some(
+                COMMAND_CALL
+                    .replace("RETURN_ADDRESS", &call.return_address)
+                    .replace("N_ARGS", &call.n_args.to_string())
+                    .replace("FUNCTION_NAME", &call.function_name),
+            ),
+            Instruction::CFunction(ref function) => Some(
+                COMMAND_FUNCTION
+                    .replace("FUNCTION_NAME", &function.function_name)
+                    .replace("N_VARS", &function.n_args.to_string()),
+            ),
+            Instruction::CReturn => Some(COMMAND_RETURN.to_string()),
         };
         match compiled_instruction {
             Some(instruction_asm) => result.push(instruction_asm),
@@ -256,3 +171,21 @@ fn create_arithmetic_operator(
         },
     }
 }
+
+pub fn create_bootstrap_code() -> String {
+    let mut code: String = String::from(
+        "@256   // BOOTSTRAP - set stack pointer
+D=A
+@SP
+M=D
+",
+    );
+    code.push_str(
+        &COMMAND_CALL
+            .replace("RETURN_ADDRESS", "Sys.init&ret.0")
+            .replace("N_ARGS", &0.to_string())
+            .replace("FUNCTION_NAME", "Sys.init"),
+    );
+    return code;
+}
+

@@ -1,10 +1,11 @@
 use core::panic;
+use std::collections::HashMap;
 
 use phf;
 
 use crate::instructions::{
-    ArithmeticType, BinaryArithmeticOperator, Instruction, Label, Pop, Push, Segment,
-    ShiftArithmeticOperator, UnaryArithmeticOperator,
+    ArithmeticType, BinaryArithmeticOperator, Call, Function, Instruction, Label, Pop, Push,
+    Segment, ShiftArithmeticOperator, UnaryArithmeticOperator,
 };
 
 // add, sub, neg, and, or, not, shiftleft, shiftright, eq, gt, lt
@@ -15,6 +16,12 @@ const OPERANDS_MEMORY: [&'static str; 2] = ["push", "pop"];
 const OPERANDS_GOTO: [&'static str; 2] = ["goto", "if-goto"];
 
 const OPERAND_LABEL: &'static str = "label";
+
+const OPERAND_CALL: &'static str = "call";
+
+const OPERAND_FUNCTION: &'static str = "function";
+
+const OPERAND_RETURN: &'static str = "return";
 
 const OPERANDS_ARITHMETIC_IMPLICIT: phf::Map<&'static str, Instruction> = phf::phf_map! {
     "add" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Add)),
@@ -34,6 +41,7 @@ pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
     let whitespace_cleaned_lines = clear_whitespace(lines);
 
     let mut current_function: String = String::new();
+    let mut function_calls: HashMap<String, u16> = HashMap::new();
 
     let mut parsed_lines: Vec<Instruction> = vec![];
     for line in whitespace_cleaned_lines {
@@ -64,6 +72,44 @@ pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
         match operand_gotos(&line, &current_function) {
             Some(instruction) => parsed_lines.push(instruction),
             None => {}
+        }
+
+        // Call a function
+        if line.starts_with(OPERAND_CALL) {
+            let mut details = line.split_whitespace();
+            details.next();
+            let function_name: String = details.next().unwrap().to_string();
+            let n_args: u16 = details.next().unwrap().parse().unwrap();
+
+            let n_calls: u16 = match function_calls.get(&current_function) {
+                Some(e) => *e,
+                None => 1,
+            };
+            parsed_lines.push(Instruction::CCall(Call::new(
+                &function_name,
+                &"FUNCTION_NAME&ret.CALL_NUMBER"
+                    .replace("FUNCTION_NAME", &function_name)
+                    .replace("CALL_NUMBER", &n_calls.to_string()),
+                n_args,
+            )));
+            function_calls.insert(
+                current_function.clone(),
+                match n_calls {
+                    1 => 2,
+                    _ => n_calls + 1,
+                },
+            );
+        }
+
+        // Create a function
+        match operand_function(&line, &mut current_function) {
+            Some(instruction) => parsed_lines.push(instruction),
+            None => {}
+        }
+
+        // return
+        if line.starts_with(OPERAND_RETURN) {
+            parsed_lines.push(Instruction::CReturn);
         }
     }
     parsed_lines
@@ -128,4 +174,19 @@ fn operand_gotos(line: &String, current_function: &String) -> Option<Instruction
         };
     }
     None
+}
+
+fn operand_function(line: &String, current_function: &mut String) -> Option<Instruction> {
+    if !line.starts_with(OPERAND_FUNCTION) {
+        return None;
+    }
+    let mut line_details = line.split_whitespace();
+    line_details.next(); // Remove function keyword
+    *current_function = line_details.next().unwrap().to_string();
+    let n_args: u16 = line_details.next().unwrap().parse().unwrap();
+
+    Some(Instruction::CFunction(Function::new(
+        &current_function,
+        n_args,
+    )))
 }

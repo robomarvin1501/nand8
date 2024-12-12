@@ -8,9 +8,9 @@ pub enum Instruction {
     CLabel(Label),
     CGoto(Label),
     CIf(Label),
-    CFunction,
+    CFunction(Function),
     CReturn,
-    CCall,
+    CCall(Call),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -129,6 +129,40 @@ impl Label {
         } else {
             &self.parent_function
         };
-        "FUNCTION_NAME$LABEL".replace("FUNCTION_NAME", parent).replace("LABEL", &self.label)
+        "FUNCTION_NAME$LABEL"
+            .replace("FUNCTION_NAME", parent)
+            .replace("LABEL", &self.label)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub function_name: String,
+    pub return_address: String,
+    pub n_args: u16,
+}
+
+impl Call {
+    pub fn new(function_name: &String, return_address: &String, n_args: u16) -> Self {
+        Self {
+            function_name: function_name.to_string(),
+            return_address: return_address.to_string(),
+            n_args,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub function_name: String,
+    pub n_args: u16,
+}
+
+impl Function {
+    pub fn new(function_name: &String, n_args: u16) -> Self {
+        Self {
+            function_name: function_name.to_string(),
+            n_args
+        }
     }
 }
