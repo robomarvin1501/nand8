@@ -38,7 +38,6 @@ fn main() {
 }
 
 fn compile_files(input_paths: Vec<PathBuf>, output_path: &PathBuf) {
-    // TODO bootstrap code
     let bootstrap = compiler::create_bootstrap_code();
     append_to_file(output_path, vec![bootstrap]);
 
