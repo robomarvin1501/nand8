@@ -1,10 +1,9 @@
 use core::panic;
-use std::mem::replace;
 
 use crate::asm_templates::{
-    COMMAND_BINARY, COMMAND_CALL, COMMAND_COMPARE, COMMAND_FUNCTION, COMMAND_GOTO, COMMAND_IF_GOTO,
-    COMMAND_LABEL, COMMAND_POP, COMMAND_POP_DIRECT, COMMAND_PUSH, COMMAND_PUSH_DIRECT,
-    COMMAND_RETURN, COMMAND_SHIFT, COMMAND_UNARY,
+    ARITHMETIC_FORMAT_1, ARITHMETIC_FORMAT_2, COMMAND_CALL, COMMAND_COMPARE, COMMAND_FUNCTION,
+    COMMAND_GOTO, COMMAND_IF_GOTO, COMMAND_LABEL, COMMAND_POP, COMMAND_POP_DIRECT, COMMAND_PUSH,
+    COMMAND_PUSH_DIRECT, COMMAND_RETURN, COMMAND_SHIFT, COMMAND_UNARY,
 };
 
 use crate::instructions::{
@@ -48,39 +47,30 @@ fn create_arithmetic_operator(
             UnaryArithmeticOperator::Not => COMMAND_UNARY.replace("{}", "!"),
         },
         ArithmeticType::Binary(operator) => match operator {
-            BinaryArithmeticOperator::Add => COMMAND_BINARY.replace("{}", "+"),
-            BinaryArithmeticOperator::Subtract => COMMAND_BINARY.replace("{}", "-"),
-            BinaryArithmeticOperator::And => COMMAND_BINARY.replace("{}", "&"),
-            BinaryArithmeticOperator::Or => COMMAND_BINARY.replace("{}", "|"),
+            BinaryArithmeticOperator::Add => ARITHMETIC_FORMAT_1.to_string() + "M=M+D\n",
+            BinaryArithmeticOperator::Subtract => ARITHMETIC_FORMAT_1.to_string() + "M=M-D\n",
+            BinaryArithmeticOperator::And => ARITHMETIC_FORMAT_1.to_string() + "M=M&D\n",
+            BinaryArithmeticOperator::Or => ARITHMETIC_FORMAT_1.to_string() + "M=M|D\n",
             BinaryArithmeticOperator::Gt => {
                 *comparison_count += 1;
-                COMMAND_COMPARE
-                    .replace("JUMP_TYPE", "JGT")
-                    .replace(
-                        "TRUE_COMPARE",
-                        &format!("TRUE_COMPARE{}", *comparison_count),
-                    )
-                    .replace("END_COMPARE", &format!("END_COMPARE{}", *comparison_count))
+                ARITHMETIC_FORMAT_1.to_string()
+                    + &ARITHMETIC_FORMAT_2
+                        .replace("JUMP_TYPE", "JLE")
+                        .replace("JUMP_NUMBER", &*comparison_count.to_string())
             }
             BinaryArithmeticOperator::Eq => {
                 *comparison_count += 1;
-                COMMAND_COMPARE
-                    .replace("JUMP_TYPE", "JEQ")
-                    .replace(
-                        "TRUE_COMPARE",
-                        &format!("TRUE_COMPARE{}", *comparison_count),
-                    )
-                    .replace("END_COMPARE", &format!("END_COMPARE{}", *comparison_count))
+                ARITHMETIC_FORMAT_1.to_string()
+                    + &ARITHMETIC_FORMAT_2
+                        .replace("JUMP_TYPE", "JNE")
+                        .replace("JUMP_NUMBER", &*comparison_count.to_string())
             }
             BinaryArithmeticOperator::Lt => {
                 *comparison_count += 1;
-                COMMAND_COMPARE
-                    .replace("JUMP_TYPE", "JLT")
-                    .replace(
-                        "TRUE_COMPARE",
-                        &format!("TRUE_COMPARE{}", *comparison_count),
-                    )
-                    .replace("END_COMPARE", &format!("END_COMPARE{}", *comparison_count))
+                ARITHMETIC_FORMAT_1.to_string()
+                    + &ARITHMETIC_FORMAT_2
+                        .replace("JUMP_TYPE", "JGE")
+                        .replace("JUMP_NUMBER", &*comparison_count.to_string())
             }
         },
         ArithmeticType::Shift(operator) => match operator {
@@ -112,33 +102,26 @@ M=D
 fn create_push_operator(push: &Push, file_name: &str) -> Option<String> {
     let asm = match push.segment {
         Segment::Local => COMMAND_PUSH
-            .replace("BASE", "LCL")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "LCL")
             .replace("INDEX", &push.index.to_string()),
         Segment::Argument => COMMAND_PUSH
-            .replace("BASE", "ARG")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "ARG")
             .replace("INDEX", &push.index.to_string()),
         Segment::This => COMMAND_PUSH
-            .replace("BASE", "THIS")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "THIS")
             .replace("INDEX", &push.index.to_string()),
         Segment::That => COMMAND_PUSH
-            .replace("BASE", "THAT")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "THAT")
             .replace("INDEX", &push.index.to_string()),
         Segment::Pointer => {
             let pointer_register = if push.index == 0 { "THIS" } else { "THAT" };
-            COMMAND_PUSH_DIRECT
-                .replace("ORIGIN", "M")
-                .replace("INDEX", pointer_register)
+            COMMAND_PUSH_DIRECT.replace("SEGMENT", pointer_register)
         }
         Segment::Temp => COMMAND_PUSH
-            .replace("BASE", &(5 + push.index).to_string())
-            .replace("SEGMENT_ACCESS", "M") // TODO Changed from A?
-            .replace("INDEX", "0"), // Temp base starts at 5
+            .replace("SEGMENT", "R5")
+            .replace("INDEX", &(push.index + 5).to_string()), // Temp base starts at 5
         Segment::Constant => COMMAND_PUSH_DIRECT
-            .replace("ORIGIN", "A") // TODO should be M?
+            .replace("ORIGIN", "A")
             .replace("INDEX", &push.index.to_string()),
         Segment::Static => COMMAND_PUSH_DIRECT
             .replace("ORIGIN", "M")
@@ -150,25 +133,20 @@ fn create_push_operator(push: &Push, file_name: &str) -> Option<String> {
 fn create_pop_operator(pop: &Pop, file_name: &str) -> Option<String> {
     let asm = match pop.segment {
         Segment::Local => COMMAND_POP
-            .replace("BASE", "LCL")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "LCL")
             .replace("INDEX", &pop.index.to_string()),
         Segment::Argument => COMMAND_POP
-            .replace("BASE", "ARG")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "ARG")
             .replace("INDEX", &pop.index.to_string()),
         Segment::This => COMMAND_POP
-            .replace("BASE", "THIS")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "THIS")
             .replace("INDEX", &pop.index.to_string()),
         Segment::That => COMMAND_POP
-            .replace("BASE", "THAT")
-            .replace("SEGMENT_ACCESS", "M")
+            .replace("SEGMENT", "THAT")
             .replace("INDEX", &pop.index.to_string()),
         Segment::Temp => COMMAND_POP
-            .replace("BASE", &(5 + pop.index).to_string())
-            .replace("SEGMENT_ACCESS", "M") // TODO changed from A?
-            .replace("INDEX", "0"),
+            .replace("SEGMENT", "R5")
+            .replace("INDEX", &(pop.index + 5).to_string()),
         Segment::Static => {
             COMMAND_POP_DIRECT.replace("BASE", &format!("{}.{}", file_name, pop.index))
         }
@@ -186,7 +164,11 @@ fn create_label_operator(label: &Label) -> Option<String> {
 }
 
 fn create_if_operator(label: &Label) -> Option<String> {
-    Some(COMMAND_IF_GOTO.replace("LABEL", &label.extract_label_name()))
+    Some(
+        COMMAND_IF_GOTO
+            .replace("LABEL", &label.extract_label_name())
+            .replace("ARITHMETIC_FORMAT_1", ARITHMETIC_FORMAT_1),
+    )
 }
 
 fn create_goto_operator(label: &Label) -> Option<String> {
@@ -196,7 +178,7 @@ fn create_goto_operator(label: &Label) -> Option<String> {
 fn create_call_operator(call: &Call) -> Option<String> {
     Some(
         COMMAND_CALL
-            .replace("RETURN_ADDRESS", &call.return_address)
+            .replace("FUNCTION_LABEL", &call.return_address)
             .replace("N_ARGS", &call.n_args.to_string())
             .replace("FUNCTION_NAME", &call.function_name)
             .replace(

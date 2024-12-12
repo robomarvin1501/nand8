@@ -1,26 +1,64 @@
-pub const COMMAND_BINARY: &'static str = "@SP   // BINARY command
-AM=M-1         // Decrement SP and point to the topmost value
-D=M            // Store the topmost value (y) in D
-@SP
-AM=M-1         // Decrement SP again to point to the second topmost value
-M=M{}D         // Perform binary operation: x OPERATOR y, store the result in the current top of stack
-@SP
-M=M+1          // Increment SP to point to the new top of the stack
+pub const COMMAND_UNARY: &'static str = "@SP  // UNARY command
+A=M-1
+M={}M
 ";
 
-pub const COMMAND_UNARY: &'static str = r#"@SP  // UNARY command
+//         return new StringBuilder()
+//         .append("@SP\n")
+//         .append("AM=M-1\n")
+//         .append("D=M\n")
+//         .append("A=A-1\n").toString();
+pub const ARITHMETIC_FORMAT_1: &'static str = "@SP
 AM=M-1
-M={}M
-@SP
-M=M+1
-"#;
+D=M
+A=A-1
+";
 
-pub const COMMAND_SHIFT: &'static str = r#"@SP  // SHIFT command
+//         return new StringBuilder()
+//         .append("D=M-D\n")
+//         .append("@FALSE")
+//         .append(mJumpNumber)
+//         .append("\n")
+//         .append("D;")
+//         .append(strJump)
+//         .append("\n@SP\n")
+//         .append("A=M-1\n")
+//         .append("M=-1\n")
+//         .append("@CONTINUE")
+//         .append(mJumpNumber)
+//         .append("\n0;JMP\n")
+//         .append("(FALSE")
+//         .append(mJumpNumber)
+//         .append(")\n")
+//         .append("@SP\n")
+//         .append("A=M-1\n")
+//         .append("M=0\n")
+//         .append("(CONTINUE")
+//         .append(mJumpNumber)
+//         .append(")\n").toString();
+pub const ARITHMETIC_FORMAT_2: &'static str = "D=M-D
+@FALSE.JUMP_NUMBER
+D;JUMP_TYPE
+@SP
+A=M-1
+M=-1
+@CONTINUE.JUMP_NUMBER
+0;JMP
+
+(FALSE.JUMP_NUMBER)
+@SP
+A=M-1
+M=0
+
+(CONTINUE.JUMP_NUMBER)
+";
+
+pub const COMMAND_SHIFT: &'static str = "@SP  // SHIFT command
 AM=M-1
 M=M{}
 @SP
 M=M+1
-"#;
+";
 
 pub const COMMAND_COMPARE: &'static str = "@SP   // COMPARISON command (EQ, GT, LT)
 AM=M-1         // Decrement SP and point to the topmost value (y)
@@ -56,8 +94,8 @@ M=M+1          // Increment SP to point to the new top of the stack
 //         .append("M=D\n")
 //         .append("@SP\n")
 //         .append("M=M+1\n").toString();
-pub const COMMAND_PUSH: &'static str = "@BASE   // PUSH command
-D=SEGMENT_ACCESS // Load the base address or constant value into D
+pub const COMMAND_PUSH: &'static str = "@SEGMENT   // PUSH command
+D=M              // Load the base address or constant value into D
 @INDEX
 A=D+A            // Compute the effective address (base + index)
 D=M              // Load the value at the effective address into D
@@ -98,8 +136,8 @@ M=M+1            // Increment the stack pointer
 //         .append("@R13\n")
 //         .append("A=M\n")
 //         .append("M=D\n").toString();
-pub const COMMAND_POP: &'static str = "@BASE    // POP command
-D=SEGMENT_ACCESS // Load the base address into D
+pub const COMMAND_POP: &'static str = "@SEGMENT    // POP command
+D=M              // Load the base address into D
 @INDEX
 D=D+A            // Compute the effective address (base + index)
 @R13
@@ -122,7 +160,7 @@ M=D              // Store the value at the effective address
 //         .append("@R13\n")
 //         .append("A=M\n")
 //         .append("M=D\n").toString();
-pub const COMMAND_POP_DIRECT: &'static str = "@BASE // POP DIRECT
+pub const COMMAND_POP_DIRECT: &'static str = "@SEGMENT // POP DIRECT
 D=A
 @R13
 M=D
@@ -141,14 +179,14 @@ pub const COMMAND_GOTO: &'static str = "@LABEL // GOTO
 0;JMP
 ";
 
-pub const COMMAND_IF_GOTO: &'static str = "@SP // IF-GOTO
-AM=M-1
-D=M
+pub const COMMAND_IF_GOTO: &'static str = "// IF-GOTO
+ARITHMETIC_FORMAT_1
 @LABEL
 D;JNE            // True is any non zero value
 ";
 
-//             fw.write(new StringBuilder().append("@").append(strLabel)
+//             fw.write(new StringBuilder()
+//             .append("@").append(strLabel)
 //             .append("\n")
 //             .append("D=A\n@SP\nA=M\nM=D\n@SP\nM=M+1\n")
 //             .append(getPushFormat2("LCL"))
@@ -174,12 +212,13 @@ D;JNE            // True is any non zero value
 //             .append("\n0;JMP\n(")
 //             .append(strLabel)
 //             .append(")\n").toString());
-pub const COMMAND_CALL: &'static str = "@RETURN_ADDRESS     // CALL FUNCTION
+pub const COMMAND_CALL: &'static str = "@FUNCTION_LABEL     // CALL FUNCTION
 D=A                // Push return address
 @SP
-AM=M+1
-A=A-1
+A=M
 M=D
+@SP
+M=M+1
 
 PUSH_LCL
 
@@ -206,7 +245,7 @@ M=D
 @FUNCTION_NAME          // Jump to the function
 0;JMP
 
-(RETURN_ADDRESS)   // Declare return address label
+(FUNCTION_LABEL)   // Declare return address label
 ";
 
 pub const COMMAND_FUNCTION: &'static str = "(FUNCTION_NAME) // FUNCTION create new function
@@ -276,7 +315,7 @@ POP_ARG
 @ARG                // Restore SP of the caller (SP = ARG + 1)
 D=M+1
 @SP
-D=M
+M=D
 
 @FRAME              // Restore THAT of the caller (THAT = *(FRAME - 1))
 D=M-1
@@ -299,13 +338,13 @@ D=M
 @ARG
 M=D
 
-@FRAME
+@FRAME              // Restore LCL of the caller (LCL *(FRAME - 4))
 D=M-1
 AM=D
 D=M
-
 @LCL
 M=D
+
 @RET                // Go to the return address (goto RET)
 A=M
 0;JMP
