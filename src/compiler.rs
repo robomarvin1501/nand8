@@ -1,7 +1,7 @@
 use core::panic;
 
 use crate::asm_templates::{
-    ARITHMETIC_FORMAT_1, ARITHMETIC_FORMAT_2, COMMAND_CALL, COMMAND_COMPARE, COMMAND_FUNCTION,
+    ARITHMETIC_FORMAT_1, ARITHMETIC_FORMAT_2, COMMAND_CALL, COMMAND_FUNCTION,
     COMMAND_GOTO, COMMAND_IF_GOTO, COMMAND_LABEL, COMMAND_POP, COMMAND_POP_DIRECT, COMMAND_PUSH,
     COMMAND_PUSH_DIRECT, COMMAND_RETURN, COMMAND_SHIFT, COMMAND_UNARY,
 };
@@ -130,6 +130,25 @@ fn create_push_operator(push: &Push, file_name: &str) -> Option<String> {
     Some(asm)
 }
 
+fn create_call_push(push: &Push) -> Option<String> {
+    let asm = match push.segment {
+        Segment::Local => COMMAND_PUSH_DIRECT
+            .replace("INDEX", "LCL")
+            .replace("ORIGIN", "M"),
+        Segment::Argument => COMMAND_PUSH_DIRECT
+            .replace("INDEX", "ARG")
+            .replace("ORIGIN", "M"),
+        Segment::This => COMMAND_PUSH_DIRECT
+            .replace("INDEX", "THIS")
+            .replace("ORIGIN", "M"),
+        Segment::That => COMMAND_PUSH_DIRECT
+            .replace("INDEX", "THAT")
+            .replace("ORIGIN", "M"),
+        _ => panic!("Unsupported segment for call: {}", push.segment),
+    };
+    Some(asm)
+}
+
 fn create_pop_operator(pop: &Pop, file_name: &str) -> Option<String> {
     let asm = match pop.segment {
         Segment::Local => COMMAND_POP
@@ -148,11 +167,11 @@ fn create_pop_operator(pop: &Pop, file_name: &str) -> Option<String> {
             .replace("SEGMENT", "R5")
             .replace("INDEX", &(pop.index + 5).to_string()),
         Segment::Static => {
-            COMMAND_POP_DIRECT.replace("BASE", &format!("{}.{}", file_name, pop.index))
+            COMMAND_POP_DIRECT.replace("SEGMENT", &format!("{}.{}", file_name, pop.index))
         }
         Segment::Pointer => {
             let pointer_register = if pop.index == 0 { "THIS" } else { "THAT" };
-            COMMAND_POP_DIRECT.replace("BASE", pointer_register)
+            COMMAND_POP_DIRECT.replace("SEGMENT", pointer_register)
         }
         Segment::Constant => panic!("Cannot pop from constant"),
     };
@@ -183,19 +202,23 @@ fn create_call_operator(call: &Call) -> Option<String> {
             .replace("FUNCTION_NAME", &call.function_name)
             .replace(
                 "PUSH_LCL",
-                &create_push_operator(&Push::new(Segment::Local, 0), "").unwrap(),
+                // &create_push_operator(&Push::new(Segment::Local, 0), "").unwrap(),
+                &create_call_push(&Push::new(Segment::Local, 0)).unwrap(),
             )
             .replace(
                 "PUSH_ARG",
-                &create_push_operator(&Push::new(Segment::Argument, 0), "").unwrap(),
+                // &create_push_operator(&Push::new(Segment::Argument, 0), "").unwrap(),
+                &create_call_push(&Push::new(Segment::Argument, 0)).unwrap(),
             )
             .replace(
                 "PUSH_THIS",
-                &create_push_operator(&Push::new(Segment::This, 0), "").unwrap(),
+                // &create_push_operator(&Push::new(Segment::This, 0), "").unwrap(),
+                &create_call_push(&Push::new(Segment::This, 0)).unwrap(),
             )
             .replace(
                 "PUSH_THAT",
-                &create_push_operator(&Push::new(Segment::That, 0), "").unwrap(),
+                // &create_push_operator(&Push::new(Segment::That, 0), "").unwrap(),
+                &create_call_push(&Push::new(Segment::That, 0)).unwrap(),
             ),
     )
 }

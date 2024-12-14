@@ -60,40 +60,19 @@ M=M{}
 M=M+1
 ";
 
-pub const COMMAND_COMPARE: &'static str = "@SP   // COMPARISON command (EQ, GT, LT)
-AM=M-1         // Decrement SP and point to the topmost value (y)
-D=M            // Store the topmost value (y) in D
-@SP
-AM=M-1         // Decrement SP again to point to the second topmost value (x)
-D=M-D          // Subtract y from x (D = x - y)
-@TRUE_COMPARE  // Jump to TRUE_COMPARE if the condition is met
-D;JUMP_TYPE    // Conditional jump: JUMP_TYPE is replaced with JEQ, JGT, or JLT
-@SP
-A=M            // Point to the current top of the stack
-M=0            // Set the result to false (0) because the condition is not met
-@END_COMPARE   // Jump to END_COMPARE to skip the true case
-0;JMP          // Unconditional jump to END_COMPARE
-(TRUE_COMPARE)
-@SP
-A=M            // Point to the current top of the stack
-M=-1           // Set the result to true (-1) because the condition is met
-(END_COMPARE)
-@SP
-M=M+1          // Increment SP to point to the new top of the stack
-";
-
-//         strACode = new StringBuilder()
-//         .append("@").append(strSegment)
-//         .append("\nD=M\n@")
-//         .append(nIndex)
-//         .append("\n")
-//         .append("A=D+A\n")
-//         .append("D=M\n")
-//         .append("@SP\n")
-//         .append("A=M\n")
-//         .append("M=D\n")
-//         .append("@SP\n")
-//         .append("M=M+1\n").toString();
+//          strACode = new StringBuilder()
+//          .append("@")
+//          .append(strSegment)
+//          .append("\nD=M\n@")
+//          .append(nIndex)
+//          .append("\n")
+//          .append("A=D+A\n")
+//          .append("D=M\n")
+//          .append("@SP\n")
+//          .append("A=M\n")
+//          .append("M=D\n")
+//          .append("@SP\n")
+//          .append("M=M+1\n").toString();
 pub const COMMAND_PUSH: &'static str = "@SEGMENT   // PUSH command
 D=M              // Load the base address or constant value into D
 @INDEX
@@ -215,10 +194,9 @@ D;JNE            // True is any non zero value
 pub const COMMAND_CALL: &'static str = "@FUNCTION_LABEL     // CALL FUNCTION
 D=A                // Push return address
 @SP
-A=M
+AM=M+1
+A=A-1
 M=D
-@SP
-M=M+1
 
 PUSH_LCL
 
