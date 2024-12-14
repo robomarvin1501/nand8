@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-
-use phf;
+use std::sync::Once;
 
 use crate::instructions::{
     ArithmeticType, BinaryArithmeticOperator, Call, Function, Instruction, Label, Pop, Push,
@@ -20,21 +19,69 @@ const OPERAND_FUNCTION: &'static str = "function";
 
 const OPERAND_RETURN: &'static str = "return";
 
-const OPERANDS_ARITHMETIC_IMPLICIT: phf::Map<&'static str, Instruction> = phf::phf_map! {
-    "add" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Add)),
-    "sub" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Subtract)),
-    "neg" => Instruction::CArithmetic(ArithmeticType::Unary(UnaryArithmeticOperator::Negate)),
-    "and" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::And)),
-    "or" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Or)),
-    "not" => Instruction::CArithmetic(ArithmeticType::Unary(UnaryArithmeticOperator::Not)),
-    "shiftleft" => Instruction::CArithmetic(ArithmeticType::Shift(ShiftArithmeticOperator::ShiftLeft)),
-    "shiftright" => Instruction::CArithmetic(ArithmeticType::Shift(ShiftArithmeticOperator::ShiftRight)),
-    "eq" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Eq)),
-    "gt" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Gt)),
-    "lt" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Lt))
-};
+static mut CONST_HASHMAP: Option<HashMap<&'static str, Instruction>> = None;
+static INIT: Once = Once::new();
+
+fn get_const_hashmap() -> &'static HashMap<&'static str, Instruction> {
+    unsafe {
+        INIT.call_once(|| {
+            let mut map = HashMap::new();
+            map.insert(
+                "add",
+                Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Add)),
+            );
+            map.insert(
+                "sub",
+                Instruction::CArithmetic(ArithmeticType::Binary(
+                    BinaryArithmeticOperator::Subtract,
+                )),
+            );
+            map.insert(
+                "neg",
+                Instruction::CArithmetic(ArithmeticType::Unary(UnaryArithmeticOperator::Negate)),
+            );
+            map.insert(
+                "and",
+                Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::And)),
+            );
+            map.insert(
+                "or",
+                Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Or)),
+            );
+            map.insert(
+                "not",
+                Instruction::CArithmetic(ArithmeticType::Unary(UnaryArithmeticOperator::Not)),
+            );
+            map.insert(
+                "shiftleft",
+                Instruction::CArithmetic(ArithmeticType::Shift(ShiftArithmeticOperator::ShiftLeft)),
+            );
+            map.insert(
+                "shiftright",
+                Instruction::CArithmetic(ArithmeticType::Shift(
+                    ShiftArithmeticOperator::ShiftRight,
+                )),
+            );
+            map.insert(
+                "eq",
+                Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Eq)),
+            );
+            map.insert(
+                "gt",
+                Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Gt)),
+            );
+            map.insert(
+                "lt",
+                Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Lt)),
+            );
+            CONST_HASHMAP = Some(map);
+        });
+        CONST_HASHMAP.as_ref().unwrap()
+    }
+}
 
 pub fn parse(lines: Vec<String>, function_calls: &mut HashMap<String, u16>) -> Vec<Instruction> {
+    let operands_arithmetic_implicit = get_const_hashmap();
     let whitespace_cleaned_lines = clear_whitespace(lines);
 
     let mut current_function: String = String::new();
@@ -42,7 +89,7 @@ pub fn parse(lines: Vec<String>, function_calls: &mut HashMap<String, u16>) -> V
     let mut parsed_lines: Vec<Instruction> = vec![];
     for line in whitespace_cleaned_lines {
         // Arithmetic
-        match OPERANDS_ARITHMETIC_IMPLICIT.get(&line) {
+        match operands_arithmetic_implicit.get(line.as_str()) {
             Some(instr) => {
                 parsed_lines.push(instr.to_owned());
                 continue;
