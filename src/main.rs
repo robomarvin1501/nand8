@@ -93,7 +93,7 @@ fn create_vm_file_path(input: &Path) -> Result<PathBuf, String> {
         let dir_name = input
             .file_name()
             .ok_or("Failed to extract directory name")?;
-        let mut new_file_path = input.to_path_buf();
+        let mut new_file_path = input.parent().unwrap().to_path_buf();
         new_file_path.push(dir_name);
         new_file_path.set_extension(ASM_FILE_EXTENSION);
         Ok(new_file_path)
