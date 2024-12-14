@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::HashMap;
 
 use phf;
@@ -7,8 +6,6 @@ use crate::instructions::{
     ArithmeticType, BinaryArithmeticOperator, Call, Function, Instruction, Label, Pop, Push,
     Segment, ShiftArithmeticOperator, UnaryArithmeticOperator,
 };
-
-// add, sub, neg, and, or, not, shiftleft, shiftright, eq, gt, lt
 
 const COMMENT_BEGIN: &str = "//";
 
