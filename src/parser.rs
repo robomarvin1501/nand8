@@ -23,6 +23,11 @@ static mut CONST_HASHMAP: Option<HashMap<&'static str, Instruction>> = None;
 static INIT: Once = Once::new();
 
 fn get_const_hashmap() -> &'static HashMap<&'static str, Instruction> {
+    // This code should not exist. However, the inability of the internal testing
+    // system to use the internet requires a new way of making const HashMaps
+    // than using an external library, and the age of the rust version on uni
+    // computers (1.63 if you can believe it) means that using Lazy is not an
+    // option, as that was added to std in 1.70.
     unsafe {
         INIT.call_once(|| {
             let mut map = HashMap::new();
