@@ -1,4 +1,4 @@
-use core::{fmt, panic};
+use core::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -162,7 +162,7 @@ impl Function {
     pub fn new(function_name: &String, n_args: u16) -> Self {
         Self {
             function_name: function_name.to_string(),
-            n_args
+            n_args,
         }
     }
 }

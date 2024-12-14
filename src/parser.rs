@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::HashMap;
 
 use phf;
@@ -7,8 +6,6 @@ use crate::instructions::{
     ArithmeticType, BinaryArithmeticOperator, Call, Function, Instruction, Label, Pop, Push,
     Segment, ShiftArithmeticOperator, UnaryArithmeticOperator,
 };
-
-// add, sub, neg, and, or, not, shiftleft, shiftright, eq, gt, lt
 
 const COMMENT_BEGIN: &str = "//";
 
@@ -37,11 +34,10 @@ const OPERANDS_ARITHMETIC_IMPLICIT: phf::Map<&'static str, Instruction> = phf::p
     "lt" => Instruction::CArithmetic(ArithmeticType::Binary(BinaryArithmeticOperator::Lt))
 };
 
-pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
+pub fn parse(lines: Vec<String>, function_calls: &mut HashMap<String, u16>) -> Vec<Instruction> {
     let whitespace_cleaned_lines = clear_whitespace(lines);
 
     let mut current_function: String = String::new();
-    let mut function_calls: HashMap<String, u16> = HashMap::new();
 
     let mut parsed_lines: Vec<Instruction> = vec![];
     for line in whitespace_cleaned_lines {
@@ -56,7 +52,10 @@ pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
 
         // Memory operations
         match operand_memory(&line) {
-            Some(instruction) => parsed_lines.push(instruction),
+            Some(instruction) => {
+                parsed_lines.push(instruction);
+                continue;
+            }
             None => {}
         }
 
@@ -66,11 +65,15 @@ pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
                 &current_function,
                 &line.split_whitespace().nth(1).unwrap().to_string(),
             )));
+            continue;
         }
 
         // Jumps
         match operand_gotos(&line, &current_function) {
-            Some(instruction) => parsed_lines.push(instruction),
+            Some(instruction) => {
+                parsed_lines.push(instruction);
+                continue;
+            }
             None => {}
         }
 
@@ -81,6 +84,7 @@ pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
             let function_name: String = details.next().unwrap().to_string();
             let n_args: u16 = details.next().unwrap().parse().unwrap();
 
+            current_function = function_name.clone();
             let n_calls: u16 = match function_calls.get(&current_function) {
                 Some(e) => *e,
                 None => 1,
@@ -99,17 +103,22 @@ pub fn parse(lines: Vec<String>) -> Vec<Instruction> {
                     _ => n_calls + 1,
                 },
             );
+            continue;
         }
 
         // Create a function
         match operand_function(&line, &mut current_function) {
-            Some(instruction) => parsed_lines.push(instruction),
+            Some(instruction) => {
+                parsed_lines.push(instruction);
+                continue;
+            }
             None => {}
         }
 
         // return
         if line.starts_with(OPERAND_RETURN) {
             parsed_lines.push(Instruction::CReturn);
+            continue;
         }
     }
     parsed_lines

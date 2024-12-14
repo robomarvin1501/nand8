@@ -1,10 +1,11 @@
+use std::collections::HashMap;
+use std::fs::File;
 use std::{
     env,
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
 };
-use std::fs::File;
 
 mod asm_templates;
 mod compiler;
@@ -41,6 +42,7 @@ fn compile_files(input_paths: Vec<PathBuf>, output_path: &PathBuf) {
     let bootstrap = compiler::create_bootstrap_code();
     append_to_file(output_path, vec![bootstrap]);
 
+    let mut function_calls: HashMap<String, u16> = HashMap::new();
     for input_path in input_paths {
         if let Some(extension) = input_path.extension() {
             if extension.to_str().unwrap_or("").to_lowercase() != VM_FILE_EXTENSION {
@@ -52,29 +54,32 @@ fn compile_files(input_paths: Vec<PathBuf>, output_path: &PathBuf) {
 
         let input_file = PathBuf::from(input_path);
 
-        compile_file(input_file, output_path);
+        compile_file(input_file, output_path, &mut function_calls);
     }
 }
 
-fn compile_file(input_path: PathBuf, output_path: &PathBuf) {
+fn compile_file(input_path: PathBuf, output_path: &PathBuf, function_calls: &mut HashMap<String, u16>) {
     let contents: String =
-        fs::read_to_string(input_path).expect("Should have been able to read file");
+        fs::read_to_string(&input_path).expect("Should have been able to read file");
     let lines: Vec<String> = contents.split("\n").map(|s| s.trim().to_string()).collect();
 
-    let instructions = parser::parse(lines);
+    let file_name = &input_path.file_stem().unwrap().to_str().unwrap();
+    let instructions = parser::parse(lines, function_calls);
 
-    let file_name = &output_path.file_stem().unwrap().to_str().unwrap();
     let compiled_asm = compiler::compile(instructions, file_name);
 
     append_to_file(output_path, compiled_asm);
 }
 
 fn append_to_file(path: &PathBuf, s: Vec<String>) {
-    let mut file = OpenOptions::new().write(true).append(true).open(path).unwrap();
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(path)
+        .unwrap();
     for line in s {
         file.write(line.as_bytes()).unwrap();
     }
-
 }
 
 fn create_vm_file_path(input: &Path) -> Result<PathBuf, String> {
@@ -85,13 +90,18 @@ fn create_vm_file_path(input: &Path) -> Result<PathBuf, String> {
         Ok(new_file_path)
     } else if input.is_dir() {
         // Input is a directory, create a file named after the directory with the new extension
-        let dir_name = input.file_name()
+        let dir_name = input
+            .file_name()
             .ok_or("Failed to extract directory name")?;
         let mut new_file_path = input.to_path_buf();
         new_file_path.push(dir_name);
         new_file_path.set_extension(ASM_FILE_EXTENSION);
         Ok(new_file_path)
     } else {
-        Err(format!("Input path {:?} is neither a file nor a directory", input))
+        Err(format!(
+            "Input path {:?} is neither a file nor a directory",
+            input
+        ))
     }
 }
+
